@@ -15,5 +15,3 @@ def controller(state, target_pos, dt):
 
 def methid():
     print("Hello")
-
-print("aa")
