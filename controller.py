@@ -12,6 +12,3 @@ def controller(state, target_pos, dt):
 
     action = (0, 0)
     return action
-
-def methid():
-    print("Hello")
