@@ -6,7 +6,7 @@ i_u = 0
 
 # Global state for tuning
 tuning_state = {
-    'kp': 0.292,  # Starting Kp
+    'kp': 0.29,  # Starting Kp
     'min_error': float('inf'),
     'max_error': float('-inf'),
     'oscillation_detected': False,
@@ -14,7 +14,7 @@ tuning_state = {
     'timer': 0,
     'start_timer': False,
     'error_range': 0.01,  # Range within which we consider the error to be close to min or max
-    'error_mag': 0.001,  # Error magnitude to consider oscillation,
+    'error_mag': 0.002,  # Error magnitude to consider oscillation,
     'error_diff': 0.1,  # Error difference to adjust Kp
     'process_time': 20  # Time to adjust Kp based on error difference
     
@@ -81,7 +81,7 @@ def check_for_oscillation(error, dt):
 
     if tuning_state["timer"] > 10 and tuning_state['error_diff'] <= tuning_state['error_mag']:
         # If within error range of min or max error, start or stop timer
-        if tuning_state['min_error'] - tuning_state['error_range'] <= tuning_state['error_diff'] <= tuning_state['min_error'] + tuning_state['error_range']:
+        if tuning_state['min_error'] - tuning_state['error_range'] <= error <= tuning_state['min_error'] + tuning_state['error_range']:
             
             # Start timer for oscillation
             if not tuning_state['start_timer']:
@@ -90,7 +90,7 @@ def check_for_oscillation(error, dt):
                 print("Start Timer for Oscillation")
         
         # Check for oscillation end
-        elif tuning_state['max_error'] - tuning_state['error_range'] <= tuning_state['error_diff'] <= tuning_state['max_error'] + tuning_state['error_range']:
+        elif tuning_state['max_error'] - tuning_state['error_range'] <= error <= tuning_state['max_error'] + tuning_state['error_range']:
             if tuning_state['start_timer']:
                 # Oscillation cycle complete, (current time - start time = elapsed time)
                 Tu = tuning_state['timer'] - tuning_state['start_time']
@@ -113,6 +113,14 @@ def adjust_kp_based_on_error_difference():
         tuning_state['kp'] += 0.02
     elif error_diff > 0.01:
         tuning_state['kp'] += 0.001
+    
+    elif error_diff < -1:
+        tuning_state['kp'] -= 0.1
+    elif error_diff < -0.1:
+        tuning_state['kp'] -= 0.01
+    elif error_diff < -0.01:
+        tuning_state['kp'] -= 0.001
+
     print(f"Adjusting Kp to {tuning_state['kp']:.4f} for next iteration")
 
     # Reset for next test
