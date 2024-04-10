@@ -94,6 +94,7 @@ def check_for_oscillation(error, dt):
             if tuning_state['start_timer']:
                 # Oscillation cycle complete, (current time - start time = elapsed time)
                 Tu = tuning_state['timer'] - tuning_state['start_time']
+                print("Error Difference:", tuning_state['error_diff'])
                 print(f"Oscillation Detected with Kp={tuning_state['kp']}, Tu={Tu}. Testing Complete. Please end the simulation.")
                 tuning_state['oscillation_detected'] = True
 
