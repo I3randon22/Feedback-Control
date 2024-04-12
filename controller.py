@@ -54,7 +54,7 @@ class PIDController:
         self.Kp = invar
     
 pid_y = PIDController(Kp=0.175, Ki=0.112, Kd=0.068, max_limit=1/0.112, min_limit=0)
-pid_x = PIDController(Kp=0.1, Ki=0, Kd=0, max_limit=1, min_limit=0)
+pid_x = PIDController(Kp=0.01, Ki=0, Kd=0, max_limit=1, min_limit=0)
 pid_attitude = PIDController(Kp=10, Ki=0, Kd=0, max_limit=1, min_limit=0)
 
 # Implement a controller
@@ -71,7 +71,7 @@ def controller(state, target_pos, dt):
     # Calculate the error (Change accorindly to your needs)
     errorY = state[1] - target_pos[1]
     errorX = state[0] - target_pos[0]
-    errorAttitude = state[4] * 0.01  # Assuming index 4 is attitude 
+    errorAttitude = state[4] * 0.3  # Assuming index 4 is attitude 
 
     pid_output_y = pid_y.calculate(errorY, dt)
     pid_output_x = pid_x.calculate(errorX, dt)
