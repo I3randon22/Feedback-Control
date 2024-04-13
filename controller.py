@@ -5,7 +5,7 @@ tune = False  # Set to True to tune the controller
 
 # Global state for tuning
 tuning_state = {
-    'kp': 0.0008,  # Starting Kp
+    'kp': 0.198,  # Starting Kp
     'min_error': float('inf'),
     'max_error': float('-inf'),
     'oscillation_detected': False,
@@ -50,12 +50,31 @@ class PIDController:
 
         return pid_u
     
+    # Edit values directly using these functions
     def SetKp(self, invar):
         self.Kp = invar
-    
+        
+    def SetKi(self, invar):
+        self.Ki = invar
+        
+    def SetKd(self, invar):
+        self.Kd = invar
+        
+        
+#5,3,2 for pid_y also works well / 0.175, 0.112, 0.068
 pid_y = PIDController(Kp=0.175, Ki=0.112, Kd=0.068, max_limit=1/0.112, min_limit=0)
-pid_x = PIDController(Kp=0.01, Ki=0, Kd=0, max_limit=1, min_limit=0)
-pid_attitude = PIDController(Kp=10, Ki=0, Kd=0, max_limit=1, min_limit=0)
+#0.2 // 0.12, 0.348, 0.0102 // 0.03
+pid_x = PIDController(Kp=1.8, Ki=0.07, Kd=1.6, max_limit=10, min_limit=0)
+#0.75, 0.28, 0.095 / 0.5, 0.25, 0.09
+pid_attitude = PIDController(Kp=15, Ki=4, Kd=9, max_limit=10, min_limit=0)
+
+
+import numpy as np
+
+def normalize_angle(angle):
+    """ Normalize an angle to [-π, π] range """
+    return (angle + np.pi) % (2 * np.pi) - np.pi
+
 
 # Implement a controller
 def controller(state, target_pos, dt):
@@ -71,15 +90,18 @@ def controller(state, target_pos, dt):
     # Calculate the error (Change accorindly to your needs)
     errorY = state[1] - target_pos[1]
     errorX = state[0] - target_pos[0]
-    errorAttitude = state[4] * 0.3  # Assuming index 4 is attitude 
 
+    # Normalize the current attitude and calculate the error
+    current_normalized_attitude = normalize_angle(state[4])
+    
+    
     pid_output_y = pid_y.calculate(errorY, dt)
     pid_output_x = pid_x.calculate(errorX, dt)
-    #pid_output_attitude = pid_attitude.calculate(errorAttitude, dt)  # Control drone's attitude
-
+    pid_output_attitude = pid_attitude.calculate(current_normalized_attitude, dt)  # Control drone's attitude
+    
     # Thrust adjustments for lateral movement
-    left_thrust = pid_output_y - pid_output_x - errorAttitude
-    right_thrust = pid_output_y + pid_output_x + errorAttitude
+    left_thrust = pid_output_y - (pid_output_x + pid_output_attitude)
+    right_thrust = pid_output_y + (pid_output_x + pid_output_attitude)
 
     action = [left_thrust, right_thrust]
     
@@ -96,7 +118,7 @@ def controller(state, target_pos, dt):
 def check_for_oscillation(error, dt):
     global tuning_state
     
-     # Update min and max errors
+    # Update min and max errors
     tuning_state['min_error'] = min(tuning_state['min_error'], error)
     tuning_state['max_error'] = max(tuning_state['max_error'], error)
     tuning_state['error_diff'] = tuning_state['max_error'] + tuning_state['min_error']
@@ -105,7 +127,7 @@ def check_for_oscillation(error, dt):
     tuning_state['timer'] += dt
     
     # Check for oscillation after 10 seconds have passed
-    if tuning_state["timer"] > 10 and tuning_state['error_diff'] <= tuning_state['error_mag']:
+    if tuning_state["timer"] > 10 and abs(tuning_state['error_diff']) <= tuning_state['error_mag']:
         # If within error range of min or max error, start or stop timer
         if tuning_state['min_error'] - tuning_state['error_range'] <= error <= tuning_state['min_error'] + tuning_state['error_range']:
             
@@ -136,11 +158,15 @@ def adjust_kp_based_on_error_difference():
         
     # Define scaling factors for Kp adjustment
     scale_factor = 0.02
-
+    
     # Directly use error_diff to adjust Kp
     if abs(error_diff) > 0.001:  # Ensure there's a significant error before adjusting
-        adjustment = error_diff * (scale_factor if error_diff > 0 else -scale_factor)
-        tuning_state['kp'] += adjustment
+        adjustment = abs(error_diff) * scale_factor
+        adjustment = 0
+        if error_diff < 0:
+            tuning_state['kp'] += adjustment
+        elif error_diff > 0:
+            tuning_state['kp'] -= adjustment
 
     print(f"Adjusting Kp to {tuning_state['kp']:.4f} for next iteration")
 
