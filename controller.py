@@ -92,6 +92,10 @@ def controller(state, target_pos, dt):
     # Calculate the error (Change accorindly to your needs)
     errorY = state[1] - target_pos[1]
     errorX = state[0] - target_pos[0]
+    
+    # Offset temporary solution
+    if target_pos[0] < 4:
+        errorX -= 0.6
 
     # Normalize the current attitude and calculate the error
     current_normalized_attitude = normalize_angle(state[4])
@@ -103,13 +107,14 @@ def controller(state, target_pos, dt):
     
     #Just a test to see if we can cap the pitch#
     # if attitude is greater than 0.2 radians or less than -0.2 radians, reduce thrust and try to level out
+    '''
     if(state[4] > 1):
         thrust *= 0.8  # reduce thrust by 20%
         pitch = 0.8
     elif(state[4] < -1):
         thrust *= 0.8  # reduce thrust by 20%
         pitch = -0.8
-        
+    '''
     
     # Thrust adjustments for lateral movement
     motor1_pwm = thrust - (pitch + pid_output_attitude)
