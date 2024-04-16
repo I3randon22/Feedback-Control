@@ -1,33 +1,35 @@
 wind_active = False  # Select whether you want to activate wind or not
 group_number = 32  # Enter your group number here
-tune = False  # Set to True to tune the controller
+tune = False  # Set to True to tune the controller (Only works for y-axis controller)
 #0.292 posy
 
 # Global state for tuning
 tuning_state = {
     'kp': 0.198,  # Starting Kp
-    'min_error': float('inf'),
-    'max_error': float('-inf'),
-    'oscillation_detected': False,
-    'start_time': None,
-    'timer': 0,
+    'min_error': float('inf'), # Min error to check for oscillation (bottom point of oscillation cycle)
+    'max_error': float('-inf'), # Max error to check for oscillation (top point of oscillation cycle)
+    'oscillation_detected': False, # Flag to check if oscillation detected
+    'start_time': None, # Start timer flag for oscillation
+    'timer': 0, # Timer to check for one cycle of oscillation
     'start_timer': False,
     'error_range': 0.01,  # Range within which we consider the error to be close to min or max
-    'error_mag': 0.002,  # Error magnitude to consider oscillation,
-    'error_diff': 0.1,  # Error difference to adjust Kp
-    'process_time': 20  # Time to adjust Kp based on error difference
+    'error_mag': 0.002,  # Error magnitude, when error difference is less than this, we check for oscillation
+    'error_diff': 0.1,  # Error difference to check for oscillation, gets updated based on min and max error
+    'process_time': 20  # Time to check for oscillation, if no oscillation detected, adjust Kp
 }
 
+# PID Controller class, easy to use and edit values directly as we have multiple PID controllers
 class PIDController:
-    def __init__(self, Kp=0, Ki=0, Kd=0, max_limit=float('inf'), min_limit=float('-inf')):
-        self.Kp = Kp
-        self.Ki = Ki
-        self.Kd = Kd
+    # Initialize the PID controller
+    def __init__(self, kp=0, ki=0, kd=0, max_limit=float('inf'), min_limit=float('-inf')):
+        self.kp = kp
+        self.ki = ki
+        self.kd = kd
         self.max_limit = max_limit
         self.min_limit = min_limit
         self.prev_error = None
         self.i_u = 0
-
+    # Calculate the PID output
     def calculate(self, error, dt):
         
         # Set prev error for first iteration
@@ -35,15 +37,16 @@ class PIDController:
             self.prev_error = error
         
         # Proportional term
-        p_u = self.Kp * error
+        p_u = self.kp * error
 
         # Integral term
-        self.i_u += self.Ki * error * dt
-        self.i_u = max(min(self.i_u, self.max_limit), self.min_limit)  # Integral windup
+        self.i_u += self.ki * error * dt
+        self.i_u = max(min(self.i_u, self.max_limit), self.min_limit)  # Integral windup 
 
         # Derivative term
-        d_u = self.Kd * (error - self.prev_error) / dt
-
+        d_u = self.kd * (error - self.prev_error) / dt
+        
+        # Calculate PID output
         pid_u = p_u + self.i_u + d_u
 
         self.prev_error = error
@@ -51,29 +54,28 @@ class PIDController:
         return pid_u
     
     # Edit values directly using these functions
-    def SetKp(self, invar):
-        self.Kp = invar
+    def set_kp(self, invar):
+        self.kp = invar
         
-    def SetKi(self, invar):
-        self.Ki = invar
+    def set_ki(self, invar):
+        self.ki = invar
         
-    def SetKd(self, invar):
-        self.Kd = invar
+    def set_kd(self, invar):
+        self.kd = invar
         
-        
+# PID values for tuning       
 #5,3,2 for pid_y also works well / 0.175, 0.112, 0.068
-pid_y = PIDController(Kp=0.175, Ki=0.112, Kd=0.068, max_limit=1/0.112, min_limit=0)
+pid_y = PIDController(kp=0.175, ki=0.112, kd=0.068, max_limit=1/0.112, min_limit=0)
 #0.2 // 0.12, 0.348, 0.0102 // 0.03
-pid_x = PIDController(Kp=1.8, Ki=0.07, Kd=1.6, max_limit=10, min_limit=0)
+pid_x = PIDController(kp=0.12, ki=0.348, kd=0.0102, max_limit=1/0.348, min_limit=0)
 #0.75, 0.28, 0.095 / 0.5, 0.25, 0.09
-pid_attitude = PIDController(Kp=15, Ki=4, Kd=9, max_limit=10, min_limit=0)
+pid_attitude = PIDController(kp=16, ki=4, kd=9, max_limit=1, min_limit=0)
 
 
-import numpy as np
-
+# Function to normalize an angle to [-π, π] range
 def normalize_angle(angle):
-    """ Normalize an angle to [-π, π] range """
-    return (angle + np.pi) % (2 * np.pi) - np.pi
+    pi = 3.141592653589793
+    return (angle + pi) % (2 * pi) - pi
 
 
 # Implement a controller
@@ -95,17 +97,26 @@ def controller(state, target_pos, dt):
     current_normalized_attitude = normalize_angle(state[4])
     
     
-    pid_output_y = pid_y.calculate(errorY, dt)
-    pid_output_x = pid_x.calculate(errorX, dt)
+    thrust = pid_y.calculate(errorY, dt)
+    pitch = pid_x.calculate(errorX, dt)
     pid_output_attitude = pid_attitude.calculate(current_normalized_attitude, dt)  # Control drone's attitude
     
+    #Just a test to see if we can cap the pitch#
+    # if attitude is greater than 0.2 radians or less than -0.2 radians, reduce thrust and try to level out
+    if(state[4] > 0.698):
+        thrust *= 0.8  # reduce thrust by 20%
+        pitch = 0.2
+    elif(state[4] < -0.698):
+        thrust *= 0.8  # reduce thrust by 20%
+        pitch = -0.2
+        
+    
     # Thrust adjustments for lateral movement
-    left_thrust = pid_output_y - (pid_output_x + pid_output_attitude)
-    right_thrust = pid_output_y + (pid_output_x + pid_output_attitude)
+    motor1_pwm = thrust - (pitch + pid_output_attitude)
+    motor2_pwm = thrust + (pitch + pid_output_attitude)
 
-    action = [left_thrust, right_thrust]
-    
-    
+    print(f"Thrust: {thrust:.4f}, Pitch: {pitch:.4f}")
+    action = [motor1_pwm, motor2_pwm]
     
     # Check for oscillation if not already detected
     if not tuning_state['oscillation_detected'] and tune:
@@ -114,7 +125,7 @@ def controller(state, target_pos, dt):
     
     return action
     
-
+# Function to check if there is oscillation, if no oscillation detected, adjust the Kp based on error difference
 def check_for_oscillation(error, dt):
     global tuning_state
     
@@ -141,9 +152,9 @@ def check_for_oscillation(error, dt):
         elif tuning_state['max_error'] - tuning_state['error_range'] <= error <= tuning_state['max_error'] + tuning_state['error_range']:
             if tuning_state['start_timer']:
                 # Oscillation cycle complete, (current time - start time = elapsed time)
-                Tu = (tuning_state['timer'] - tuning_state['start_time']) * 2
+                tu = (tuning_state['timer'] - tuning_state['start_time']) * 2
                 print("Error Difference:", tuning_state['error_diff'])
-                print(f"Oscillation Detected with Kp={tuning_state['kp']}, Tu={Tu}. Testing Complete. Please end the simulation.")
+                print(f"Oscillation Detected with Kp={tuning_state['kp']}, Tu={tu}. Testing Complete. Please end the simulation.")
                 tuning_state['oscillation_detected'] = True
 
     # Adjust Kp based on the error difference after 60 seconds if no oscillation detected
@@ -154,15 +165,13 @@ def adjust_kp_based_on_error_difference():
     global tuning_state
     error_diff = tuning_state['error_diff']
     print(f"Error Difference: {error_diff:.4f}")
-    # Adjust Kp based on error difference (Subject to change based on tuning requirements)
-        
+
     # Define scaling factors for Kp adjustment
     scale_factor = 0.02
     
     # Directly use error_diff to adjust Kp
     if abs(error_diff) > 0.001:  # Ensure there's a significant error before adjusting
         adjustment = abs(error_diff) * scale_factor
-        adjustment = 0
         if error_diff < 0:
             tuning_state['kp'] += adjustment
         elif error_diff > 0:
