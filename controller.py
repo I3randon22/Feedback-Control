@@ -21,12 +21,10 @@ tuning_state = {
 # PID Controller class, easy to use and edit values directly as we have multiple PID controllers
 class PIDController:
     # Initialize the PID controller
-    def __init__(self, kp=0, ki=0, kd=0, max_limit=float('inf'), min_limit=float('-inf')):
+    def __init__(self, kp=0, ki=0, kd=0):
         self.kp = kp
         self.ki = ki
         self.kd = kd
-        self.max_limit = max_limit
-        self.min_limit = min_limit
         self.prev_error = None
         self.i_u = 0
     # Calculate the PID output
@@ -41,7 +39,7 @@ class PIDController:
 
         # Integral term
         self.i_u += self.ki * error * dt
-        self.i_u = max(min(self.i_u, self.max_limit), self.min_limit)  # Integral windup 
+        self.i_u = self.i_u
 
         # Derivative term
         d_u = self.kd * (error - self.prev_error) / dt
@@ -65,11 +63,11 @@ class PIDController:
         
 # PID values for tuning       
 #5,3,2 for pid_y also works well / 0.175, 0.112, 0.068
-pid_y = PIDController(kp=0.175, ki=0.112, kd=0.068, max_limit=1/0.112, min_limit=0)
+pid_y = PIDController(kp=0.175, ki=0.112, kd=0.068)
 #0.2 // 0.12, 0.348, 0.0102 // 0.03
-pid_x = PIDController(kp=1.2, ki=0.4, kd=1, max_limit=10, min_limit=0)
+pid_x = PIDController(kp=1.2, ki=0.4, kd=1)
 #0.75, 0.28, 0.095 / 0.5, 0.25, 0.09
-pid_attitude = PIDController(kp=9, ki=4, kd=3, max_limit=10, min_limit=0)
+pid_attitude = PIDController(kp=9, ki=4, kd=3)
 
 
 # Function to normalize an angle to [-π, π] range
@@ -94,8 +92,8 @@ def controller(state, target_pos, dt):
     errorX = state[0] - target_pos[0]
     
     # Offset temporary solution
-    if target_pos[0] < 4:
-        errorX -= 0.6
+    #if target_pos[0] < 4:
+        #errorX -= 0.6
 
     # Normalize the current attitude and calculate the error
     current_normalized_attitude = normalize_angle(state[4])
@@ -120,7 +118,6 @@ def controller(state, target_pos, dt):
     motor1_pwm = thrust - (pitch + pid_output_attitude)
     motor2_pwm = thrust + (pitch + pid_output_attitude)
 
-    print(f"Thrust: {thrust:.4f}, Pitch: {pitch:.4f}")
     action = [motor1_pwm, motor2_pwm]
     
     # Check for oscillation if not already detected
