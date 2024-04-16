@@ -39,7 +39,6 @@ class PIDController:
 
         # Integral term
         self.i_u += self.ki * error * dt
-        self.i_u = self.i_u
 
         # Derivative term
         d_u = self.kd * (error - self.prev_error) / dt
