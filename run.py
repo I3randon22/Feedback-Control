@@ -7,6 +7,10 @@ import sys
 import importlib
 import pathlib
 
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+import random
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 targets = []
 with open("targets.csv", "r") as file:
     csvreader = csv.reader(file)
@@ -22,8 +26,10 @@ with open("targets.csv", "r") as file:
                 "WARNING: Target outside of environment bounds (0, 0) to (8, 8), not loading target"
             )
         else:
-            targets.append((float(row[0]), float(row[1])))
-
+            # targets.append((4 + random.randint(-4, 4),4 + random.randint(-4, 4)))
+            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            targets.append((4 + random.randint(-4, 4) ,4 + random.randint(-4, 4)))
+            #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 environment = Environment(
     render_mode="human",
     render_path=True,
