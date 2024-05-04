@@ -1,6 +1,6 @@
-wind_active =True  # Select whether you want to activate wind or not
+wind_active = False  # Select whether you want to activate wind or not
 group_number = 32  # Enter your group number here
-tune = False  # Set to True to tune the controller (Only works for y-axis controller)
+tune = True  # Set to True to tune the controller (Only works for y-axis controller)
 global previous_state  # Add this line at the top of your file
 global previous_target_pos  # Add this line at the top of your file
 #0.292 posy
@@ -12,7 +12,7 @@ import numpy as np
 
 # Global state for tuning
 tuning_state = {
-    'kp': 0.25,  # Starting Kp
+    'kp': 0.2,  # Starting Kp
     'min_error': float('inf'), # Min error to check for oscillation (bottom point of oscillation cycle)
     'max_error': float('-inf'), # Max error to check for oscillation (top point of oscillation cycle)
     'oscillation_detected': False, # Flag to check if oscillation detected
@@ -49,7 +49,7 @@ class PIDController:
         # I found theoretically first few seconds error is too large which produce too much negative impact
         # for I, we only need I work to make up the static error wich occur when drone close to target
         t = tuning_state['timer']
-        if t > 4:
+        if t > 0:
             self.i_u += self.ki * error * dt
         else:
             self.i_u += 0
@@ -105,43 +105,45 @@ else:
     #0.2 // 0.12, 0.348, 0.0102 // 0.03 // recent:1.2 0.4 1 // 1.5 0.01 2// 1.2 0 1.05
     pid_x = PIDController(kp=1.5, ki=0.1, kd=2)
     #0.75, 0.28, 0.095 / 0.5, 0.25, 0.09 // 9 4 3 // 15 0 5
-    pid_attitude = PIDController(kp=0.8, ki=3, kd=0.5)
+    pid_attitude = PIDController(kp=0.8, ki=4, kd=0.5)
     
 def model(state, action, dt):
     # Unpack the state and action
-    position = state[0] + state[1]
-    velocity = state[2] + state[3]
+    position_x = state[0]
+    velocity_x = state[2]
     attitude = state[4]
     
     throttle_left, throttle_right = action
 
     # Calculate the acceleration due to the throttle settings
-    acceleration = throttle_left + throttle_right
+    # sin(attitude) to get horizontal thrust
+    acceleration_x = (throttle_left + throttle_right) * np.sin(attitude)
 
     # Calculate the change in orientation due to the difference in throttle settings
-    delta_attitude = throttle_right - throttle_left
+    delta_attitude = (throttle_left - throttle_right) * dt
 
     # Update the velocity and position
-    next_velocity = velocity + acceleration * dt
-    next_position = position + velocity * dt + 0.5 * acceleration * dt**2
+    next_velocity_x = velocity_x + acceleration_x * dt
+
+    next_position_x = position_x + velocity_x * dt + 0.5 * acceleration_x * dt**2
 
     # Update the orientation
-    next_orientation = normalize_angle(attitude + delta_attitude * dt)
+    next_attitude = normalize_angle(attitude + delta_attitude)
 
     # Pack the next state
-    next_state = (next_position, next_velocity, next_orientation) 
+    next_state = (next_position_x, next_velocity_x, next_attitude) 
 
     return next_state
     
 # Implement the disturbance observer
-def disturbance_observer(current_state, next_state, action, dt):
+def disturbance_observer(previous_state, current_state, action, dt):
     # Estimate the next state using the model
-    estimated_next_state = model(current_state, action, dt)
+    estimated_next_state = model(previous_state, action, dt)
     
-    next_state = (next_state[0] + next_state[1], next_state[2] + next_state[3], next_state[4])
+    current_state = (current_state[0], current_state[2], current_state[4])
     
     # Calculate the disturbance as the difference between the estimated next state and the actual next state
-    disturbance = tuple(a - b for a, b in zip(next_state, estimated_next_state))
+    disturbance = tuple(a - b for a, b in zip(current_state, estimated_next_state))
     
     # Calculate the norm of the disturbance
     disturbance_norm = np.linalg.norm(disturbance)
@@ -249,13 +251,14 @@ def controller(state, target_pos, dt):
     #motor2_pwm = thrust + (pitch + pid_output_attitude)
     
     # Only calculate the disturbance if previous_state is not None
-    if previous_state is not None:
+    if previous_state is not None and wind_active:
         # Estimate the disturbance
-        disturbance = disturbance_observer(previous_state, state, (thrust, pid_output_attitude), dt) * 2.0
+        #strong 5
+        disturbance = disturbance_observer(previous_state, state, (thrust, pid_output_attitude), dt) * 1.2
+        print(disturbance,state[4])
         
         # Adjust the action based on the estimated disturbance
-        thrust -= disturbance
-        pid_output_attitude -= disturbance
+        pid_output_attitude += disturbance
     
     
     motor1_pwm = max(0,min(1,thrust - pid_output_attitude))
