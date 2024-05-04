@@ -28,8 +28,8 @@ with open("targets.csv", "r") as file:
         else:
             # targets.append((4 + random.randint(-4, 4),4 + random.randint(-4, 4)))
             #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            targets.append((4 + random.randint(-4, 4) ,4 + random.randint(-4, 4)))
-            #targets.append((float(row[0]), float(row[1])))
+            #targets.append((4 + random.randint(-4, 4) ,4 + random.randint(-4, 4)))
+            targets.append((float(row[0]), float(row[1])))
             #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 environment = Environment(
     render_mode="human",

@@ -1,6 +1,6 @@
-wind_active = False  # Select whether you want to activate wind or not
+wind_active = True  # Select whether you want to activate wind or not
 group_number = 32  # Enter your group number here
-tune = True  # Set to True to tune the controller (Only works for y-axis controller)
+tune = False  # Set to True to tune the controller (Only works for y-axis controller)
 global previous_state  # Add this line at the top of your file
 global previous_target_pos  # Add this line at the top of your file
 #0.292 posy
@@ -49,7 +49,7 @@ class PIDController:
         # I found theoretically first few seconds error is too large which produce too much negative impact
         # for I, we only need I work to make up the static error wich occur when drone close to target
         t = tuning_state['timer']
-        if t > 0:
+        if t > 4:
             self.i_u += self.ki * error * dt
         else:
             self.i_u += 0
